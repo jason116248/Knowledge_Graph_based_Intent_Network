@@ -32,6 +32,51 @@ def read_cf(file_name):
 
     return np.array(inter_mat)
 
+def read_cf_new():
+    # reading rating file
+    rating_file = 'data/' + args.dataset + '/ratings_final'
+    if os.path.exists(rating_file + '.npy'):
+        rating_np = np.load(rating_file + '.npy')
+    else:
+        rating_np = np.loadtxt(rating_file + '.txt', dtype=np.int64)
+        np.save(rating_file + '.npy', rating_np)
+
+    # rating_np_origin = rating_np
+    # rating_np_label = rating_np.take([2], axis=1)
+    # indix_click = np.where(rating_np_label == 1)
+    # rating_np = rating_np.take(indix_click[0], axis=0)
+    # rating_np = rating_np.take([0, 1], axis=1)
+
+    test_ratio = 0.2
+    n_ratings = rating_np.shape[0]
+    eval_indices = np.random.choice(n_ratings, size=int(n_ratings * test_ratio), replace=False)
+    left = set(range(n_ratings)) - set(eval_indices)
+    # test_indices = np.random.choice(list(left), size=int(n_ratings * test_ratio), replace=False)
+    train_indices = list(left)
+
+    train_data = rating_np[train_indices]
+    eval_data = rating_np[eval_indices]
+    # test_data = rating_np[test_indices]
+
+    train_rating = rating_np[train_indices]
+    ui_adj = generate_ui_adj(rating_np, train_rating)
+    return train_data, eval_data, ui_adj
+
+def generate_ui_adj(rating, train_rating):
+    #ui_adj = sp.dok_matrix((n_user, n_item), dtype=np.float32)
+    n_user, n_item = len(set(rating[:, 0])), len(set(rating[:, 1]))
+    ui_adj_orign = sp.coo_matrix(
+        (train_rating[:, 2], (train_rating[:, 0], train_rating[:, 1])), shape=(n_user, n_item)).todok()
+
+    # ui_adj = sp.dok_matrix((n_user+n_item, n_user+n_item), dtype=np.float32)
+    # ui_adj[:n_user, n_user:] = ui_adj_orign
+    # ui_adj[n_user:, :n_user] = ui_adj_orign.T
+    ui_adj = sp.bmat([[None, ui_adj_orign],
+                    [ui_adj_orign.T, None]], dtype=np.float32)
+    ui_adj = ui_adj.todok()
+    print('already create user-item adjacency matrix', ui_adj.shape)
+    return ui_adj
+
 
 def remap_item(train_data, test_data):
     global n_users, n_items
